@@ -1,4 +1,4 @@
-package dev.ixixpercent.cache.cache_tester.controller;
+package dev.ixixpercent.cache.cache_tester.controller.key_generator;
 
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Component;

@@ -233,7 +233,7 @@ public class IxIxCache<K, V> implements Cache<K, V> {
   public Iterator<Entry<K, V>> iterator() {
     checkClosed();
     final Iterator<Map.Entry<K, V>> iterator = store.entrySet().iterator();
-    return new Iterator<Entry<K, V>>() {
+    return new Iterator<>() {
       @Override
       public boolean hasNext() {
         return iterator.hasNext();

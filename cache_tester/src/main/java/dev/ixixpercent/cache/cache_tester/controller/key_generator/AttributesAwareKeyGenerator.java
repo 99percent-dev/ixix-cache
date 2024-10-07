@@ -1,4 +1,4 @@
-package dev.ixixpercent.cache.cache_tester.controller;
+package dev.ixixpercent.cache.cache_tester.controller.key_generator;
 
 import dev.ixixpercent.cache.cache_tester.configuration.CacheConfig;
 import dev.ixixpercent.cache.cache_tester.configuration.CachesProperties;

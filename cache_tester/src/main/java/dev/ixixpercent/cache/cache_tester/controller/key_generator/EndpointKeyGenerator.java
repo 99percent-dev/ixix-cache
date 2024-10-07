@@ -1,4 +1,4 @@
-package dev.ixixpercent.cache.cache_tester.controller;
+package dev.ixixpercent.cache.cache_tester.controller.key_generator;
 
 import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.stereotype.Component;
@@ -49,6 +49,13 @@ public class EndpointKeyGenerator implements KeyGenerator {
     return "";
   }
 
+  /**
+   * Gets the http method name to be included in the key. Also getting POST/PUT methods as there are
+   * cases where data is retrieved through these methods (form requests,etc).
+   *
+   * @param method
+   * @return
+   */
   private String getHttpMethod(Method method) {
     if (method.isAnnotationPresent(GetMapping.class)) {
       return "GET";

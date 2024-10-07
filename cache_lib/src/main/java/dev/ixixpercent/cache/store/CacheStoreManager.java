@@ -64,8 +64,7 @@ public class CacheStoreManager<K, V> implements Map<K, V> {
     // update the remote cache regardless, we do not care about the return value
     remoteMap.put(key, value);
     // use the operation result from the near cache
-    //TODO commented for testing
-    //    nearMap.put(key, value);
+    nearMap.put(key, value);
     return value;
   }
 
