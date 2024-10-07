@@ -13,6 +13,8 @@ that used the same standard.
 
 Additionally, it leverages gRPC for communication between cache nodes and provides a flexible API for cache operations.
 
+[Classes diagram](./cache_lib/overview.png)
+
 ## Spring Cache Integration
 
 The cache system works with Spring Cache.
@@ -65,6 +67,13 @@ to use standard implementation as it allows for swapping caching implementations
 
 The `cache_tester` is used to test the functionality and performance of the cache by exposing basic endpoints to be
 cached.
+
+The cache tester also contains the key generators for caches. The key generators create a MD5 hash of the attributes
+specified above for each case in order to normalize how keys
+will look in the cache itself.
+See ![key generators diagram](./cache_tester/src/main/java/dev/ixixpercent/cache/cache_tester/controller/key_generator/key_generators.png)
+for a diagram
+or [the classes themselves](./cache_tester/src/main/java/dev/ixixpercent/cache/cache_tester/controller/key_generator/)
 
 Cache tester can be started as Spring Boot application using `./gradlew bootRun`
 
