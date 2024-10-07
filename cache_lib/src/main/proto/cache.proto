@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package cache;
+
+option java_package = "dev.ixixpercent.cache.grpc";
+option java_outer_classname = "CacheServiceProto";
+
+service CacheService {
+  rpc Get (GetRequest) returns (GetResponse);
+  rpc Put (PutRequest) returns (PutResponse);
+  rpc Remove (RemoveRequest) returns (RemoveResponse);
+  rpc ContainsKey (ContainsKeyRequest) returns (ContainsKeyResponse);
+  rpc Size (SizeRequest) returns (SizeResponse);
+  rpc IsEmpty (IsEmptyRequest) returns (IsEmptyResponse);
+  rpc Clear (ClearRequest) returns (ClearResponse);
+  rpc PutAll (PutAllRequest) returns (PutAllResponse);
+  rpc GetAll (GetAllRequest) returns (GetAllResponse);
+}
+
+message GetRequest {
+  string map_name = 1;
+  bytes key = 2;
+}
+
+message GetResponse {
+  bytes value = 1;
+}
+
+message PutRequest {
+  string map_name = 1;
+  bytes key = 2;
+  bytes value = 3;
+}
+
+message PutResponse {
+  // Empty for simplicity
+}
+
+message RemoveRequest {
+  string map_name = 1;
+  bytes key = 2;
+}
+
+message RemoveResponse {
+  // Empty for simplicity
+}
+
+message ContainsKeyRequest {
+  string map_name = 1;
+  bytes key = 2;
+}
+
+message ContainsKeyResponse {
+  bool exists = 1;
+}
+
+message SizeRequest {
+  string map_name = 1;
+}
+
+message SizeResponse {
+  int32 size = 1;
+}
+
+message IsEmptyRequest {
+  string map_name = 1;
+}
+
+message IsEmptyResponse {
+  bool is_empty = 1;
+}
+
+message ClearRequest {
+  string map_name = 1;
+}
+
+message ClearResponse {
+  // Empty for simplicity
+}
+
+message PutAllRequest {
+  string map_name = 1;
+  repeated Entry entries = 2;
+}
+
+message PutAllResponse {
+  // Empty for simplicity
+}
+
+message GetAllRequest {
+  string map_name = 1;
+  repeated bytes keys = 2;
+}
+
+message GetAllResponse {
+  repeated Entry entries = 1;
+}
+
+message Entry {
+  bytes key = 1;
+  bytes value = 2;
+}

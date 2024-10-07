@@ -1,0 +1,86 @@
+plugins {
+  id 'java'
+  id 'maven-publish'
+  id 'com.google.protobuf' version '0.9.4' // Add Protobuf plugin
+}
+
+group = 'dev.ixixpercent.cache'
+version = '0.0.1'
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      from components.java
+    }
+  }
+}
+
+configurations {
+  compileOnly {
+    extendsFrom annotationProcessor
+  }
+}
+
+dependencies {
+
+  // Lombok for boilerplate code reduction
+  compileOnly 'org.projectlombok:lombok:1.18.34'
+  annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+  // Cache API and SLF4J for logging
+  implementation(
+    'javax.cache:cache-api:1.1.1',
+    'org.slf4j:slf4j-api:2.0.16',
+
+    'javax.annotation:javax.annotation-api:1.3',
+//    'jakarta.annotation:jakarta.annotation-api:3.0.0',
+
+    // Apache Commons Pool for Kryo Pooling
+    'org.apache.commons:commons-pool2:2.12.0',
+
+    // Kryo Serialization Dependencies
+    'com.esotericsoftware:kryo:5.6.0',
+    'de.javakaffee:kryo-serializers:0.45',
+
+    // Jackson Serialization Dependencies
+    'com.fasterxml.jackson.core:jackson-databind:2.18.0',
+    'com.fasterxml.jackson.core:jackson-core:2.18.0',
+    'com.fasterxml.jackson.core:jackson-annotations:2.18.0',
+
+    // Protobuf and gRPC Dependencies
+    'com.google.protobuf:protobuf-java-util:4.28.0',
+    'io.grpc:grpc-netty-shaded:1.65.1',
+    'io.grpc:grpc-protobuf:1.65.1',
+    'io.grpc:grpc-stub:1.65.1'
+  )
+  // Test Dependencies
+  testImplementation platform('org.junit:junit-bom:5.11.2')
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+protobuf {
+  protoc { artifact = "com.google.protobuf:protoc:4.28.0" }
+  plugins { grpc { artifact = "io.grpc:protoc-gen-grpc-java:1.65.1" } }
+  generateProtoTasks {
+    all()*.plugins { grpc { option 'jakarta_omit' } }
+  }
+}
+
+test {
+  useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile) {
+  options.encoding = 'UTF-8'
+}

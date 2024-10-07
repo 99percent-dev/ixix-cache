@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: cache_tester
+  cache:
+    type: jcache
+    jcache:
+      provider: dev.ixixpercent.cache.SimpleCacheProvider
+
+server:
+  servlet:
+    session:
+      tracking-modes: cookie
+
+caches:
+  attributes1:
+    ttl: 10000
+    parameters:
+      - id
+    headers:
+      - Custom
+  attributes2:
+    headers:
+      - User-Agent

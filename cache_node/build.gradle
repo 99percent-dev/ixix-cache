@@ -1,0 +1,165 @@
+plugins {
+  id 'java'
+  id 'maven-publish'
+  id 'com.google.protobuf' version '0.9.4' // Protobuf plugin
+  id 'com.bmuschko.docker-remote-api' version '9.4.0' // Docker plugin
+}
+
+group = 'dev.ixixpercent.cache'
+version = '0.0.1'
+
+static def gitCommit() {
+  def commit = ""
+  def proc = "git rev-parse HEAD".execute()
+  proc.in.eachLine { line -> commit = line }
+  proc.err.eachLine { line -> println line }
+  proc.waitFor()
+  commit
+}
+
+
+project.ext.set('branch', System.getProperty("branch"))
+project.ext.set('commit', gitCommit())
+project.ext.set('buildNumber', System.getProperty("buildNumber"))
+
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+      // Optionally, you can add more metadata here
+      // e.g., pom { ... }
+    }
+  }
+}
+
+configurations {
+  compileOnly {
+    extendsFrom annotationProcessor
+  }
+  // Create a runtimeClasspath configuration for including dependencies in the JAR
+  runtimeClasspath {
+    extendsFrom configurations.runtimeOnly
+  }
+}
+
+dependencies {
+  // Lombok for boilerplate code reduction
+  compileOnly 'org.projectlombok:lombok:1.18.34'
+  annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+  // Cache API and SLF4J for logging
+  implementation(
+    // Apache Commons Pool for Kryo Pooling
+    'org.apache.commons:commons-pool2:2.12.0',
+
+    'javax.cache:cache-api:1.1.1',
+
+    // Needed by generated protobuf code
+    'javax.annotation:javax.annotation-api:1.3',
+    //    'jakarta.annotation:jakarta.annotation-api:3.0.0',
+
+    // Kryo Serialization Dependencies
+    'com.esotericsoftware:kryo:5.6.0',
+    'de.javakaffee:kryo-serializers:0.45',
+
+    // Jackson Serialization Dependencies
+    'com.fasterxml.jackson.core:jackson-databind:2.18.0',
+    'com.fasterxml.jackson.core:jackson-core:2.18.0',
+    'com.fasterxml.jackson.core:jackson-annotations:2.18.0',
+
+    // Protobuf and gRPC Dependencies
+    'com.google.protobuf:protobuf-java:4.28.0',
+    'io.grpc:grpc-netty-shaded:1.65.1',
+    'io.grpc:grpc-protobuf:1.65.1',
+    'io.grpc:grpc-stub:1.65.1',
+
+    // Logging Framework (e.g., SLF4J with Logback)
+    'org.slf4j:slf4j-api:2.0.16'
+  )
+  runtimeOnly 'ch.qos.logback:logback-classic:1.5.8'
+
+  // Test Dependencies
+  testImplementation platform('org.junit:junit-bom:5.11.2')
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+protobuf {
+  protoc {
+    artifact = 'com.google.protobuf:protoc:4.28.0'
+  }
+  plugins {
+    grpc {
+      artifact = 'io.grpc:protoc-gen-grpc-java:1.65.1'
+    }
+  }
+  // Enable gRPC code generation
+  generateProtoTasks {
+    all().each { task ->
+      task.plugins {
+        grpc {}
+      }
+    }
+  }
+}
+
+test {
+  useJUnitPlatform()
+}
+
+jar {
+  archiveBaseName.set('app')
+  archiveVersion.set('0.0.1')
+  archiveClassifier.set('')
+  archiveExtension.set('jar')
+
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE // Handle duplicate entries
+
+  manifest {
+    attributes(
+      'Main-Class': 'dev.ixixpercent.cache.node.CacheNode'
+    )
+  }
+
+  from {
+    configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+  }
+
+  // Exclude specific META-INF files to prevent duplicates
+  exclude 'META-INF/LICENSE.txt'
+  exclude 'META-INF/NOTICE.txt'
+  exclude 'META-INF/*.SF'
+  exclude 'META-INF/*.DSA'
+  exclude 'META-INF/*.RSA'
+}
+
+
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+
+task dockerImage(type: DockerBuildImage, dependsOn: jar) {
+  copy {
+    from "./"
+    into "build/libs"
+    include "Dockerfile"
+  }
+  inputDir = file('./build/libs')
+  images = ["cache-node:${version}_${project.commit}"]
+  buildArgs = ['JAR_FILE': "${archivesBaseName}-${version}.jar"]
+}
+
+
+tasks.withType(JavaCompile) {
+  options.encoding = 'UTF-8'
+}
