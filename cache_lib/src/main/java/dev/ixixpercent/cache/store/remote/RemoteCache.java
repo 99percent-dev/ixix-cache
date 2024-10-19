@@ -1,25 +1,7 @@
 package dev.ixixpercent.cache.store.remote;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import com.google.protobuf.ByteString;
-import dev.ixixpercent.cache.connector.CacheServiceGrpcFactory;
-import dev.ixixpercent.cache.grpc.CacheServiceGrpc;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.ClearRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.ContainsKeyRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.GetAllRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.GetAllResponse;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.GetRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.GetResponse;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.IsEmptyRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.PutAllRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.PutRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.RemoveRequest;
-import dev.ixixpercent.cache.grpc.CacheServiceProto.SizeRequest;
-import dev.ixixpercent.cache.store.serialization.pooling.KryoPoolUtil;
-import lombok.extern.slf4j.Slf4j;
+import static com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY;
+import static com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.OBJECT_AND_NON_CONCRETE;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -33,54 +15,55 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.google.protobuf.ByteString;
+
+import dev.ixixpercent.cache.connector.CacheServiceGrpcFactory;
+import dev.ixixpercent.cache.grpc.CacheServiceGrpc;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.ClearRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.ContainsKeyRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.GetAllRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.GetAllResponse;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.GetRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.GetResponse;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.IsEmptyRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.PutAllRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.PutRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.RemoveRequest;
+import dev.ixixpercent.cache.grpc.CacheServiceProto.SizeRequest;
+import dev.ixixpercent.cache.store.serialization.KryoSerializer;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 public class RemoteCache<K, V> implements Map<K, V> {
 
   private final ObjectMapper mapper;
   private final String mapName;
-  private final CacheServiceGrpcFactory stubFactory;
   // TODO key type is currently just string but if other classes are used the serialization will fail
-  private final Class<K> keyType;
   private final Class<V> valueType;
   private final CacheServiceGrpc.CacheServiceBlockingStub stub;
 
 
   public RemoteCache(String mapName, CacheServiceGrpcFactory stubFactory, Class<K> keyType, Class<V> valueType) {
     this.mapName = mapName;
-    this.stubFactory = stubFactory;
-    this.keyType = keyType;
     this.valueType = valueType;
     mapper = new ObjectMapper();
     this.mapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance,
-                                      ObjectMapper.DefaultTyping.EVERYTHING,
-                                      JsonTypeInfo.As.PROPERTY);
+                                      OBJECT_AND_NON_CONCRETE,
+                                      PROPERTY);
     this.stub = stubFactory.getStub();
   }
 
 
   // Kryo Serialization
   private byte[] serialize(Object obj) {
-    Kryo kryo = KryoPoolUtil.borrowKryo();
-    try (com.esotericsoftware.kryo.io.Output output = new com.esotericsoftware.kryo.io.Output(4096, -1)) {
-      kryo.writeClassAndObject(output, mapper.writeValueAsString(obj));
-      return output.toBytes();
-    } catch (Exception e) {
-      throw new RuntimeException("Serialization error", e);
-    } finally {
-      KryoPoolUtil.releaseKryo(kryo);
-    }
+    return KryoSerializer.serialize(obj);  
   }
 
   // Kryo Deserialization
   private Object deserialize(byte[] bytes) {
-    Kryo kryo = KryoPoolUtil.borrowKryo();
-    try (com.esotericsoftware.kryo.io.Input input = new com.esotericsoftware.kryo.io.Input(bytes)) {
-      return mapper.readValue((String) kryo.readClassAndObject(input), valueType);
-    } catch (Exception e) {
-      throw new RuntimeException("Deserialization error", e);
-    } finally {
-      KryoPoolUtil.releaseKryo(kryo);
-    }
+    return KryoSerializer.deserialize(bytes, valueType); 
   }
 
   @Override
@@ -161,6 +144,7 @@ public class RemoteCache<K, V> implements Map<K, V> {
     stub.clear(ClearRequest.newBuilder().setMapName(mapName).build());
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public Set<K> keySet() {
     GetAllRequest request = GetAllRequest.newBuilder().setMapName(mapName).build();
@@ -172,6 +156,7 @@ public class RemoteCache<K, V> implements Map<K, V> {
     return keys;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public Collection<V> values() {
     GetAllRequest request = GetAllRequest.newBuilder().setMapName(mapName).build();
@@ -183,6 +168,7 @@ public class RemoteCache<K, V> implements Map<K, V> {
     return values;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public Set<Entry<K, V>> entrySet() {
     GetAllRequest request = GetAllRequest.newBuilder().setMapName(mapName).build();

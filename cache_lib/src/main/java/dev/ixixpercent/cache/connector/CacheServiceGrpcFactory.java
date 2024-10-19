@@ -1,23 +1,42 @@
 package dev.ixixpercent.cache.connector;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.ixixpercent.cache.grpc.CacheServiceGrpc;
-import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static java.util.concurrent.TimeUnit.SECONDS;
-
 /**
- * Factory class for managing CacheServiceGrpc.CacheServiceBlockingStub instances.
- * Provides stubs in a round-robin fashion from a dynamically managed list of nodes.
+ * CacheServiceGrpcFactory is a factory class responsible for managing instances of 
+ * CacheServiceGrpc.CacheServiceBlockingStub. It provides a mechanism to create and 
+ * manage gRPC channels and stubs in a round-robin fashion from a dynamically 
+ * managed list of nodes.
+ * 
+ * <p>This class is designed to handle multiple nodes, allowing for the addition 
+ * and removal of nodes, as well as health checks to ensure that only healthy 
+ * nodes are used for gRPC calls. It maintains a cache of channels and stubs 
+ * to optimize performance and resource usage.</p>
+ * 
+ * <p>Key features include:</p>
+ * <ul>
+ *   <li>Thread-safe management of nodes using a concurrent data structure.</li>
+ *   <li>Round-robin selection of nodes for load balancing.</li>
+ *   <li>Automatic health checks to remove unhealthy nodes from the pool.</li>
+ *   <li>Logging of significant events for monitoring and debugging purposes.</li>
+ * </ul>
+ * 
+ * <p>Usage:</p>
+ * <pre>
+ * CacheServiceGrpcFactory factory = new CacheServiceGrpcFactory();
+ * factory.addNode("localhost", 50051);
+ * CacheServiceGrpc.CacheServiceBlockingStub stub = factory.getStub();
+ * </pre>
  */
 @Slf4j
 public class CacheServiceGrpcFactory {
@@ -33,14 +52,21 @@ public class CacheServiceGrpcFactory {
   private final AtomicInteger roundRobinIndex = new AtomicInteger(0);
 
 
-  // TODO extract in a health checker component
-  // Executor for asynchronous health checks
-  private final ScheduledExecutorService healthCheckExecutor = Executors.newScheduledThreadPool(1);
-
   public CacheServiceGrpcFactory() {
     // Schedule periodic health checks
     // wait an initial period
-    healthCheckExecutor.scheduleAtFixedRate(this::performHealthChecks, 10, 10, SECONDS);
+    new HealthChecker.Builder().withFactory(this).withCheckIntervalSeconds(10).buildAndStart();
+  }
+
+  /**
+   * Retrieves the set of node keys in the format "host:port".
+   *
+   * @return a Set of node keys
+   */
+  public List<String> getNodes() {
+    // Implement the logic to return the current nodes
+    // For example:
+    return Collections.unmodifiableList(this.nodes);
   }
 
   /**
@@ -176,44 +202,13 @@ public class CacheServiceGrpcFactory {
     });
   }
 
-
   /**
-   * Performs health checks on all nodes and removes any that are unhealthy.
+   * Retrieves a ManagedChannel from the cache based on the given key.
+   *
+   * @param key the key in the format "host:port"
+   * @return the ManagedChannel associated with the key, or null if not found
    */
-  private void performHealthChecks() {
-    log.info("Performing health checks on all nodes...");
-    for (String key : nodes) {
-      String[] parts = key.split(":");
-      String host = parts[0];
-      int port = Integer.parseInt(parts[1]);
-      //TODO add more sophisticated health checking
-
-      ManagedChannel channel = channelCache.get(key);
-      if (channel == null || channel.isShutdown() || channel.isTerminated()) {
-        log.warn("Channel for node {} is shutdown or terminated. Removing node.", key);
-        removeNode(host, port);
-      }
-      try {
-        ConnectivityState state = channel.getState(true);
-        switch (state) {
-          case CONNECTING, READY, IDLE -> {
-            log.trace("Node {} responded, channel is in state {}", key, state);
-            // NOOP
-          }
-          case TRANSIENT_FAILURE -> {
-            log.warn("Channel for node {} is in failure. Removing node.", key);
-            removeNode(host, port);
-          }
-          case SHUTDOWN -> {
-            log.warn("Channel for node {} is in shutdown. Removing node.", key);
-            removeNode(host, port);
-          }
-        }
-      } catch (RuntimeException e) {
-        log.error("Failed to perform health checks on node {}", key, e);
-        removeNode(host, port);
-      }
-    }
+  public ManagedChannel getChannelFromCache(String key) {
+    return channelCache.get(key);
   }
 }
-
